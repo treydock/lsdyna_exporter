@@ -75,7 +75,7 @@ func main() {
              <body>
              <h1>ls-dyna Exporter</h1>
              <p><a href='` + metricsEndpoint + `'>Metrics</a></p>
-			 <p><a href='/metrics'>Exporter Metrics</a></p>
+             <p><a href='/metrics'>Exporter Metrics</a></p>
              </body>
              </html>`))
 	})
