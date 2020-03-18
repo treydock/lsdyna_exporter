@@ -22,7 +22,7 @@ jobs:
     - codecov/upload:
         file: coverage.txt
     - prometheus/store_artifact:
-        file: lstc_exporter
+        file: lsdyna_exporter
   build:
     machine:
       image: ubuntu-1604:201903-01
@@ -70,7 +70,7 @@ jobs:
         registry: docker.io
 workflows:
   version: 2
-  lstc_exporter:
+  lsdyna_exporter:
     jobs:
     - test:
         filters:
