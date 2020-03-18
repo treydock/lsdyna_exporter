@@ -78,7 +78,7 @@ func TestMetricsHandler(t *testing.T) {
 	collector.Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
 		return featureStdout, nil
 	}
-	collector.Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+	collector.Lstc_qrun_pExec = func(target string, ctx context.Context) (string, error) {
 		return programStdout, nil
 	}
 	body, err := queryExporter()

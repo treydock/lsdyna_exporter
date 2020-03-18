@@ -43,7 +43,7 @@ No programs queued
 )
 
 func TestProgramParse(t *testing.T) {
-	metrics, err := lstc_qrun_parse(programStdout, log.NewNopLogger())
+	metrics, err := lstc_qrun_p_parse(programStdout, log.NewNopLogger())
 	if err != nil {
 		t.Errorf("Unexpected err: %s", err.Error())
 		return
@@ -67,7 +67,7 @@ func TestProgramCollector(t *testing.T) {
 	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
 		t.Fatal(err)
 	}
-	Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+	Lstc_qrun_pExec = func(target string, ctx context.Context) (string, error) {
 		return programStdout, nil
 	}
 	expected := `
@@ -97,7 +97,7 @@ func TestProgramCollectorError(t *testing.T) {
 	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
 		t.Fatal(err)
 	}
-	Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+	Lstc_qrun_pExec = func(target string, ctx context.Context) (string, error) {
 		return "", fmt.Errorf("Error")
 	}
 	expected := `
@@ -123,7 +123,7 @@ func TestProgramCollectorTimeout(t *testing.T) {
 	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
 		t.Fatal(err)
 	}
-	Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+	Lstc_qrun_pExec = func(target string, ctx context.Context) (string, error) {
 		return "", context.DeadlineExceeded
 	}
 	expected := `
@@ -152,11 +152,30 @@ func Test_lstc_qrun_exec(t *testing.T) {
 	defer func() { execCommand = exec.CommandContext }()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := lstc_qrun_exec("host", ctx)
+	out, err := lstc_qrun_p("host", ctx)
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err.Error())
 	}
 	if out != mockedStdout {
+		t.Errorf("Unexpected out: %s", out)
+	}
+}
+
+func Test_lstc_qrun_execError(t *testing.T) {
+	execCommand = fakeExecCommand
+	mockedExitStatus = 0
+	mockedStdout = "  ERROR some error"
+	defer func() { execCommand = exec.CommandContext }()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := lstc_qrun_p("host", ctx)
+	if err == nil {
+		t.Errorf("Should have returned error")
+	}
+	if err != nil && err.Error() != "some error" {
+		t.Errorf("Unexpected error message")
+	}
+	if out != "" {
 		t.Errorf("Unexpected out: %s", out)
 	}
 }

@@ -16,6 +16,8 @@ package collector
 import (
 	"bytes"
 	"context"
+	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,8 +29,8 @@ import (
 )
 
 var (
-	programTimeout = kingpin.Flag("collector.programs.timeout", "Timeout for collecting programs information").Default("10").Int()
-	Lstc_qrunExec  = lstc_qrun_exec
+	programTimeout  = kingpin.Flag("collector.programs.timeout", "Timeout for collecting programs information").Default("10").Int()
+	Lstc_qrun_pExec = lstc_qrun_p
 )
 
 type ProgramMetric struct {
@@ -94,32 +96,36 @@ func (c *ProgramCollector) collect() ([]ProgramMetric, error) {
 	var metrics []ProgramMetric
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*programTimeout)*time.Second)
 	defer cancel()
-	out, err = Lstc_qrunExec(c.target, ctx)
+	out, err = Lstc_qrun_pExec(c.target, ctx)
 	if ctx.Err() == context.DeadlineExceeded {
 		return nil, ctx.Err()
 	}
 	if err != nil {
 		return nil, err
 	}
-	metrics, err = lstc_qrun_parse(out, c.logger)
+	metrics, err = lstc_qrun_p_parse(out, c.logger)
 	if err != nil {
 		return nil, err
 	}
 	return metrics, nil
 }
 
-func lstc_qrun_exec(target string, ctx context.Context) (string, error) {
-	cmd := execCommand(ctx, *lstc_qrun, "-s", target)
+func lstc_qrun_p(target string, ctx context.Context) (string, error) {
+	cmd := execCommand(ctx, *lstc_qrun, "-s", target, "-p")
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err := cmd.Run()
-	if err != nil {
-		return "", err
+	// Non-errors have non-zero exit status, so ignore errors
+	_ = cmd.Run()
+	output := out.String()
+	re := regexp.MustCompile(`.*ERROR (.*)`)
+	match := re.FindStringSubmatch(output)
+	if len(match) == 2 {
+		return "", errors.New(match[1])
 	}
-	return out.String(), nil
+	return output, nil
 }
 
-func lstc_qrun_parse(out string, logger log.Logger) ([]ProgramMetric, error) {
+func lstc_qrun_p_parse(out string, logger log.Logger) ([]ProgramMetric, error) {
 	var metrics []ProgramMetric
 	var err error
 	lines := strings.Split(out, "\n")
