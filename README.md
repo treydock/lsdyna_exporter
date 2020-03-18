@@ -1,7 +1,8 @@
 [![Build Status](https://circleci.com/gh/treydock/lsdyna_exporter/tree/master.svg?style=shield)](https://circleci.com/gh/treydock/lsdyna_exporter)
+[![codecov](https://codecov.io/gh/treydock/lsdyna_exporter/branch/master/graph/badge.svg)](https://codecov.io/gh/treydock/lsdyna_exporter)
 [![GitHub release](https://img.shields.io/github/v/release/treydock/lsdyna_exporter?include_prereleases&sort=semver)](https://github.com/treydock/lsdyna_exporter/releases/latest)
 ![GitHub All Releases](https://img.shields.io/github/downloads/treydock/lsdyna_exporter/total)
-[![codecov](https://codecov.io/gh/treydock/lsdyna_exporter/branch/master/graph/badge.svg)](https://codecov.io/gh/treydock/lsdyna_exporter)
+![Docker Pulls](https://img.shields.io/docker/pulls/treydock/lsdyna_exporter)
 
 # ls-dyna Prometheus exporter
 
@@ -34,6 +35,14 @@ The following example assumes this exporter is running on the Prometheus server 
     target_label: instance
   - target_label: __address__
     replacement: 127.0.0.1:9309
+```
+
+## Docker
+
+Example of running the Docker container
+
+```
+docker run --rm -d -p 9309:9309 -v "/usr/local/bin/lstc_qrun:/lstc_qrun:ro" treydock/lsdyna_exporter --path.lstc_qrun=/lstc_qrun
 ```
 
 ## Install
