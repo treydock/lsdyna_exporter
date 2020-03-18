@@ -45,7 +45,6 @@ type FeatureMetric struct {
 	Free              float64
 	Total             float64
 	Queue             float64
-	Index             string
 }
 
 type FeatureAggregateMetric struct {
@@ -67,17 +66,17 @@ type FeatureCollector struct {
 func NewFeatureExporter(target string, logger log.Logger) Collector {
 	return &FeatureCollector{
 		ExpirationSeconds: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "expiration_seconds"),
-			"Number of seconds till the LTSC licenses expire", []string{"name", "index"}, nil),
+			"Number of seconds till the LTSC licenses expire", []string{"name"}, nil),
 		Used: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "used"),
-			"Number of used licenses", []string{"name", "index"}, nil),
+			"Number of used licenses", []string{"name"}, nil),
 		Free: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "free"),
-			"Number of free licenses", []string{"name", "index"}, nil),
+			"Number of free licenses", []string{"name"}, nil),
 		Total: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "total"),
-			"Number of total licenses", []string{"name", "index"}, nil),
+			"Number of total licenses", []string{"name"}, nil),
 		Queue: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "queue"),
-			"Number of queued licenses", []string{"name", "index"}, nil),
+			"Number of queued licenses", []string{"name"}, nil),
 		AggregateExpirationSeconds: prometheus.NewDesc(prometheus.BuildFQName(namespace, "feature", "aggregate_expiration_seconds"),
-			"Aggregate number of seconds for licenses to expire", []string{"index", "licenses", "features"}, nil),
+			"Aggregate number of seconds for licenses to expire", []string{"licenses", "features"}, nil),
 		target: target,
 		logger: logger,
 	}
@@ -108,11 +107,11 @@ func (c *FeatureCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	aggrMap := make(map[float64]*FeatureAggregateMetric)
 	for _, m := range metrics {
-		ch <- prometheus.MustNewConstMetric(c.ExpirationSeconds, prometheus.GaugeValue, m.ExpirationSeconds, m.Name, m.Index)
-		ch <- prometheus.MustNewConstMetric(c.Used, prometheus.GaugeValue, m.Used, m.Name, m.Index)
-		ch <- prometheus.MustNewConstMetric(c.Free, prometheus.GaugeValue, m.Free, m.Name, m.Index)
-		ch <- prometheus.MustNewConstMetric(c.Total, prometheus.GaugeValue, m.Total, m.Name, m.Index)
-		ch <- prometheus.MustNewConstMetric(c.Queue, prometheus.GaugeValue, m.Queue, m.Name, m.Index)
+		ch <- prometheus.MustNewConstMetric(c.ExpirationSeconds, prometheus.GaugeValue, m.ExpirationSeconds, m.Name)
+		ch <- prometheus.MustNewConstMetric(c.Used, prometheus.GaugeValue, m.Used, m.Name)
+		ch <- prometheus.MustNewConstMetric(c.Free, prometheus.GaugeValue, m.Free, m.Name)
+		ch <- prometheus.MustNewConstMetric(c.Total, prometheus.GaugeValue, m.Total, m.Name)
+		ch <- prometheus.MustNewConstMetric(c.Queue, prometheus.GaugeValue, m.Queue, m.Name)
 		if val, ok := aggrMap[m.ExpirationSeconds]; ok {
 			val.Licenses += m.Total
 			val.Features++
@@ -128,10 +127,10 @@ func (c *FeatureCollector) Collect(ch chan<- prometheus.Metric) {
 		aggrKeys = append(aggrKeys, exp)
 	}
 	sort.Float64s(aggrKeys)
-	for idx, exp := range aggrKeys {
+	for _, exp := range aggrKeys {
 		val := aggrMap[exp]
 		ch <- prometheus.MustNewConstMetric(c.AggregateExpirationSeconds, prometheus.GaugeValue,
-			exp, strconv.Itoa(idx), fmt.Sprintf("%d", int64(val.Licenses)), strconv.Itoa(val.Features))
+			exp, fmt.Sprintf("%d", int64(val.Licenses)), strconv.Itoa(val.Features))
 	}
 	ch <- prometheus.MustNewConstMetric(collectError, prometheus.GaugeValue, float64(errorMetric), "feature")
 	ch <- prometheus.MustNewConstMetric(collecTimeout, prometheus.GaugeValue, float64(timeout), "feature")
@@ -184,7 +183,6 @@ func lstc_qrun_r(target string, ctx context.Context) (string, error) {
 func lstc_qrun_r_parse(out string) ([]FeatureMetric, error) {
 	var metrics []FeatureMetric
 	lines := strings.Split(out, "\n")
-	index := 0
 	re := regexp.MustCompile(`^([\w\-]+)\s+(\d{2}/\d{2}/\d{4})\s+(\d+)\s+(\d+)\s+(\d+)\s+\|\s+(\d+).*`)
 	for _, l := range lines {
 		match := re.FindStringSubmatch(l)
@@ -200,9 +198,7 @@ func lstc_qrun_r_parse(out string) ([]FeatureMetric, error) {
 		metric.Free, _ = strconv.ParseFloat(match[4], 64)
 		metric.Total, _ = strconv.ParseFloat(match[5], 64)
 		metric.Queue, _ = strconv.ParseFloat(match[6], 64)
-		metric.Index = strconv.Itoa(index)
 		metrics = append(metrics, metric)
-		index++
 	}
 	return metrics, nil
 }

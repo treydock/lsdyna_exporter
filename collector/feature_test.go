@@ -89,20 +89,20 @@ func TestFeatureCollector(t *testing.T) {
     lsdyna_exporter_collect_timeout{collector="feature"} 0
 	# HELP lsdyna_feature_free Number of free licenses
 	# TYPE lsdyna_feature_free gauge
-	lsdyna_feature_free{index="0",name="LS-DYNA"} 2000
-	lsdyna_feature_free{index="1",name="MPPDYNA"} 2000
+	lsdyna_feature_free{name="LS-DYNA"} 2000
+	lsdyna_feature_free{name="MPPDYNA"} 2000
 	# HELP lsdyna_feature_queue Number of queued licenses
 	# TYPE lsdyna_feature_queue gauge
-	lsdyna_feature_queue{index="0",name="LS-DYNA"} 0
-	lsdyna_feature_queue{index="1",name="MPPDYNA"} 0
+	lsdyna_feature_queue{name="LS-DYNA"} 0
+	lsdyna_feature_queue{name="MPPDYNA"} 0
 	# HELP lsdyna_feature_total Number of total licenses
 	# TYPE lsdyna_feature_total gauge
-	lsdyna_feature_total{index="0",name="LS-DYNA"} 2000
-	lsdyna_feature_total{index="1",name="MPPDYNA"} 2000
+	lsdyna_feature_total{name="LS-DYNA"} 2000
+	lsdyna_feature_total{name="MPPDYNA"} 2000
 	# HELP lsdyna_feature_used Number of used licenses
 	# TYPE lsdyna_feature_used gauge
-	lsdyna_feature_used{index="0",name="LS-DYNA"} 0
-	lsdyna_feature_used{index="1",name="MPPDYNA"} 0
+	lsdyna_feature_used{name="LS-DYNA"} 0
+	lsdyna_feature_used{name="MPPDYNA"} 0
 	`
 	collector := NewFeatureExporter("localhost", log.NewNopLogger())
 	gatherers := setupGatherer(collector)
