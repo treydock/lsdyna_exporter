@@ -16,7 +16,6 @@ package collector
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +67,6 @@ func (c *ProgramCollector) Collect(ch chan<- prometheus.Metric) {
 		timeout = 1
 	} else if err != nil {
 		level.Error(c.logger).Log("msg", err)
-		fmt.Printf("%v", err)
 		errorMetric = 1
 	}
 

@@ -15,6 +15,8 @@ package collector
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -113,5 +115,147 @@ func TestFeatureCollector(t *testing.T) {
 		"lsdyna_feature_free", "lsdyna_feature_queue", "lsdyna_feature_total", "lsdyna_feature_used",
 		"lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func TestFeatureCollectorError(t *testing.T) {
+	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
+		t.Fatal(err)
+	}
+	mockNow, _ := time.Parse("01/02/2006", "07/01/2020")
+	timeNow = mockNow
+	Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
+		return "", fmt.Errorf("Error")
+	}
+	expected := `
+    # HELP lsdyna_exporter_collect_error Indicates if error has occurred during collection
+    # TYPE lsdyna_exporter_collect_error gauge
+    lsdyna_exporter_collect_error{collector="feature"} 1
+    # HELP lsdyna_exporter_collect_timeout Indicates the collector timed out
+    # TYPE lsdyna_exporter_collect_timeout gauge
+    lsdyna_exporter_collect_timeout{collector="feature"} 0
+	`
+	collector := NewFeatureExporter("localhost", log.NewNopLogger())
+	gatherers := setupGatherer(collector)
+	if val := testutil.CollectAndCount(collector); val != 3 {
+		t.Errorf("Unexpected collection count %d, expected 3", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(expected),
+		"lsdyna_feature_free", "lsdyna_feature_queue", "lsdyna_feature_total", "lsdyna_feature_used",
+		"lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func TestFeatureCollectorTimeout(t *testing.T) {
+	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
+		t.Fatal(err)
+	}
+	mockNow, _ := time.Parse("01/02/2006", "07/01/2020")
+	timeNow = mockNow
+	Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
+		return "", context.DeadlineExceeded
+	}
+	expected := `
+    # HELP lsdyna_exporter_collect_error Indicates if error has occurred during collection
+    # TYPE lsdyna_exporter_collect_error gauge
+    lsdyna_exporter_collect_error{collector="feature"} 0
+    # HELP lsdyna_exporter_collect_timeout Indicates the collector timed out
+    # TYPE lsdyna_exporter_collect_timeout gauge
+    lsdyna_exporter_collect_timeout{collector="feature"} 1
+	`
+	collector := NewFeatureExporter("localhost", log.NewNopLogger())
+	gatherers := setupGatherer(collector)
+	if val := testutil.CollectAndCount(collector); val != 3 {
+		t.Errorf("Unexpected collection count %d, expected 3", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(expected),
+		"lsdyna_feature_free", "lsdyna_feature_queue", "lsdyna_feature_total", "lsdyna_feature_used",
+		"lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func TestFeatureCollectorCache(t *testing.T) {
+	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
+		t.Fatal(err)
+	}
+	mockNow, _ := time.Parse("01/02/2006", "07/01/2020")
+	timeNow = mockNow
+	useCache := true
+	exporterUseCache = &useCache
+	Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
+		return featureStdout, nil
+	}
+	expected := `
+	# HELP lsdyna_feature_free Number of free licenses
+	# TYPE lsdyna_feature_free gauge
+	lsdyna_feature_free{name="LS-DYNA"} 2000
+	lsdyna_feature_free{name="MPPDYNA"} 2000
+	# HELP lsdyna_feature_queue Number of queued licenses
+	# TYPE lsdyna_feature_queue gauge
+	lsdyna_feature_queue{name="LS-DYNA"} 0
+	lsdyna_feature_queue{name="MPPDYNA"} 0
+	# HELP lsdyna_feature_total Number of total licenses
+	# TYPE lsdyna_feature_total gauge
+	lsdyna_feature_total{name="LS-DYNA"} 2000
+	lsdyna_feature_total{name="MPPDYNA"} 2000
+	# HELP lsdyna_feature_used Number of used licenses
+	# TYPE lsdyna_feature_used gauge
+	lsdyna_feature_used{name="LS-DYNA"} 0
+	lsdyna_feature_used{name="MPPDYNA"} 0
+	`
+	errorMetric := `
+    # HELP lsdyna_exporter_collect_error Indicates if error has occurred during collection
+    # TYPE lsdyna_exporter_collect_error gauge
+    lsdyna_exporter_collect_error{collector="feature"} 1
+	`
+	timeoutMetric := `
+    # HELP lsdyna_exporter_collect_timeout Indicates the collector timed out
+    # TYPE lsdyna_exporter_collect_timeout gauge
+    lsdyna_exporter_collect_timeout{collector="feature"} 1
+	`
+	collector := NewFeatureExporter("localhost", log.NewNopLogger())
+	gatherers := setupGatherer(collector)
+	if val := testutil.CollectAndCount(collector); val != 14 {
+		t.Errorf("Unexpected collection count %d, expected 14", val)
+	}
+	Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
+		return "", fmt.Errorf("Error")
+	}
+	if val := testutil.CollectAndCount(collector); val != 14 {
+		t.Errorf("Unexpected collection count %d, expected 14", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(errorMetric+expected),
+		"lsdyna_feature_free", "lsdyna_feature_queue", "lsdyna_feature_total", "lsdyna_feature_used",
+		"lsdyna_exporter_collect_error"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+	Lstc_qrun_rExec = func(target string, ctx context.Context) (string, error) {
+		return "", context.DeadlineExceeded
+	}
+	if val := testutil.CollectAndCount(collector); val != 14 {
+		t.Errorf("Unexpected collection count %d, expected 14", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(timeoutMetric+expected),
+		"lsdyna_feature_free", "lsdyna_feature_queue", "lsdyna_feature_total", "lsdyna_feature_used",
+		"lsdyna_exporter_collect_timeout"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func Test_lstc_qrun_r(t *testing.T) {
+	execCommand = fakeExecCommand
+	mockedExitStatus = 0
+	mockedStdout = "foo"
+	defer func() { execCommand = exec.CommandContext }()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := lstc_qrun_r("host", ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err.Error())
+	}
+	if out != mockedStdout {
+		t.Errorf("Unexpected out: %s", out)
 	}
 }

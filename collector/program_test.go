@@ -15,8 +15,11 @@ package collector
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -87,5 +90,73 @@ func TestProgramCollector(t *testing.T) {
 	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(expected),
 		"lsdyna_feature_user_used", "lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func TestProgramCollectorError(t *testing.T) {
+	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
+		t.Fatal(err)
+	}
+	Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+		return "", fmt.Errorf("Error")
+	}
+	expected := `
+    # HELP lsdyna_exporter_collect_error Indicates if error has occurred during collection
+    # TYPE lsdyna_exporter_collect_error gauge
+    lsdyna_exporter_collect_error{collector="program"} 1
+    # HELP lsdyna_exporter_collect_timeout Indicates the collector timed out
+    # TYPE lsdyna_exporter_collect_timeout gauge
+    lsdyna_exporter_collect_timeout{collector="program"} 0
+	`
+	collector := NewProgramExporter("localhost", log.NewNopLogger())
+	gatherers := setupGatherer(collector)
+	if val := testutil.CollectAndCount(collector); val != 3 {
+		t.Errorf("Unexpected collection count %d, expected 3", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(expected),
+		"lsdyna_feature_user_used", "lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func TestProgramCollectorTimeout(t *testing.T) {
+	if _, err := kingpin.CommandLine.Parse([]string{"--path.lstc_qrun=/dne"}); err != nil {
+		t.Fatal(err)
+	}
+	Lstc_qrunExec = func(target string, ctx context.Context) (string, error) {
+		return "", context.DeadlineExceeded
+	}
+	expected := `
+    # HELP lsdyna_exporter_collect_error Indicates if error has occurred during collection
+    # TYPE lsdyna_exporter_collect_error gauge
+    lsdyna_exporter_collect_error{collector="program"} 0
+    # HELP lsdyna_exporter_collect_timeout Indicates the collector timed out
+    # TYPE lsdyna_exporter_collect_timeout gauge
+    lsdyna_exporter_collect_timeout{collector="program"} 1
+	`
+	collector := NewProgramExporter("localhost", log.NewNopLogger())
+	gatherers := setupGatherer(collector)
+	if val := testutil.CollectAndCount(collector); val != 3 {
+		t.Errorf("Unexpected collection count %d, expected 3", val)
+	}
+	if err := testutil.GatherAndCompare(gatherers, strings.NewReader(expected),
+		"lsdyna_feature_user_used", "lsdyna_exporter_collect_error", "lsdyna_exporter_collect_timeout"); err != nil {
+		t.Errorf("unexpected collecting result:\n%s", err)
+	}
+}
+
+func Test_lstc_qrun_exec(t *testing.T) {
+	execCommand = fakeExecCommand
+	mockedExitStatus = 0
+	mockedStdout = "foo"
+	defer func() { execCommand = exec.CommandContext }()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := lstc_qrun_exec("host", ctx)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err.Error())
+	}
+	if out != mockedStdout {
+		t.Errorf("Unexpected out: %s", out)
 	}
 }

@@ -14,8 +14,45 @@
 package collector
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	mockedExitStatus = 0
+	mockedStdout     string
+	_, cancel        = context.WithTimeout(context.Background(), 5*time.Second)
+)
+
+func fakeExecCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecCommandHelper", "--", command}
+	cs = append(cs, args...)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+	es := strconv.Itoa(mockedExitStatus)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1",
+		"STDOUT=" + mockedStdout,
+		"EXIT_STATUS=" + es}
+	return cmd
+}
+
+func TestExecCommandHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+
+	//nolint:staticcheck
+	fmt.Fprintf(os.Stdout, os.Getenv("STDOUT"))
+	i, _ := strconv.Atoi(os.Getenv("EXIT_STATUS"))
+	os.Exit(i)
+}
 
 func setupGatherer(collector Collector) prometheus.Gatherer {
 	registry := prometheus.NewRegistry()
